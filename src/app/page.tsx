@@ -5,111 +5,61 @@ import {useState} from "react";
 const MATRIX_SIZE = 8;
 const SHIP_SIZE = 4;
 const MATRIX = Array.from({length: MATRIX_SIZE}, (_value, rowIndex) =>
-  Array.from({length: MATRIX_SIZE}, (_value, colIndex) => Symbol(`${rowIndex}-${colIndex}`)),
+  Array.from({length: MATRIX_SIZE}, (_value, colIndex) => [rowIndex, colIndex] as [number, number]),
 );
 
-function getCellViability(cell: symbol, ship: Set<symbol>) {
+function getCellViability(cell: [number, number], ship: Set<[number, number]>) {
   if (ship.size === 0) return true;
   else if (ship.size >= SHIP_SIZE) return false;
   else if (ship.has(cell)) return false;
-  else if (ship.size === 1) {
-    const [firstShipCellRowIndex, firstShipCellColIndex] = Array.from(ship)[0]
-      .description!.split("-")
-      .map(Number);
-    const [checkedCellRowIndex, checkedCellColIndex] = cell.description!.split("-").map(Number);
 
-    // Check we can only click cells that allow a full ship to be built
-    // ie: If I clicked [1,1] as first cell, I can't go to the left or top
-    // because there are not enough cells to build a ship
-    if (checkedCellRowIndex < firstShipCellRowIndex && checkedCellRowIndex <= 1) return false;
-    if (
-      checkedCellRowIndex > firstShipCellRowIndex &&
-      checkedCellRowIndex > MATRIX_SIZE - (SHIP_SIZE - 1)
-    )
-      return false;
-    if (checkedCellColIndex < firstShipCellColIndex && checkedCellColIndex <= 1) return false;
-    if (
-      checkedCellColIndex > firstShipCellColIndex &&
-      checkedCellColIndex > MATRIX_SIZE - (SHIP_SIZE - 1)
-    )
-      return false;
+  const [cellRow, cellCol] = cell;
+  const [lastRow, lastCol] = Array.from(ship).at(-1)!;
 
-    // Check that we only click contiguous cells
-    if (checkedCellRowIndex === firstShipCellRowIndex) {
-      if (
-        checkedCellColIndex === firstShipCellColIndex - 1 ||
-        checkedCellColIndex === firstShipCellColIndex + 1
-      )
-        return true;
-    }
-    if (checkedCellColIndex === firstShipCellColIndex) {
-      if (
-        checkedCellRowIndex === firstShipCellRowIndex - 1 ||
-        checkedCellRowIndex === firstShipCellRowIndex + 1
-      )
-        return true;
-    }
-
-    return false;
-  } else if (ship.size >= 2) {
-    const [firstShipCellRowIndex, firstShipCellColIndex] = Array.from(ship)
-      .at(0)!
-      .description!.split("-")
-      .map(Number);
-    const [lastShipCellRowIndex, lastShipCellColIndex] = Array.from(ship)
-      .at(-1)!
-      .description!.split("-")
-      .map(Number);
-    const [checkedCellRowIndex, checkedCellColIndex] = cell.description!.split("-").map(Number);
-
-    // Checks for horizontal ships
-    if (
-      firstShipCellRowIndex === lastShipCellRowIndex &&
-      checkedCellRowIndex === firstShipCellRowIndex
-    ) {
-      if (
-        firstShipCellColIndex > lastShipCellColIndex &&
-        checkedCellColIndex === lastShipCellColIndex - 1
-      )
-        return true;
-      else if (
-        firstShipCellColIndex < lastShipCellColIndex &&
-        checkedCellColIndex === lastShipCellColIndex + 1
-      )
-        return true;
-      // Checks for vertical ships
-    } else if (
-      firstShipCellColIndex === lastShipCellColIndex &&
-      checkedCellColIndex === firstShipCellColIndex
-    ) {
-      if (
-        firstShipCellRowIndex > lastShipCellRowIndex &&
-        checkedCellRowIndex === lastShipCellRowIndex - 1
-      )
-        return true;
-      else if (
-        firstShipCellRowIndex < lastShipCellRowIndex &&
-        checkedCellRowIndex === lastShipCellRowIndex + 1
-      )
-        return true;
-    }
-
-    return false;
+  // Check we can only click cells that allow a full ship to be built
+  // ie: If I clicked [1,1] as first cell, I can't go to the left or top
+  // because there are not enough cells to build a ship
+  if (lastCol === cellCol) {
+    // Doesn't fit top
+    if (cellRow + 1 < SHIP_SIZE - ship.size) return false;
+    // Doesn't fit bottom
+    if (MATRIX_SIZE - cellRow < SHIP_SIZE - ship.size) return false;
+  } else if (lastRow === cellRow) {
+    // Doesn't fit left
+    if (cellCol < lastCol && cellCol + 1 < SHIP_SIZE - ship.size) return false;
+    // Doesn't fit right
+    if (cellCol > lastCol && MATRIX_SIZE - cellCol < SHIP_SIZE - ship.size) return false;
   }
 
+  const [firstRow, firstCol] = Array.from(ship).at(0)!;
+
+  // Check that we only click contiguous cells, horizontally or vertically
+  if (ship.size === 1) {
+    if (cellRow === firstRow && (cellCol === firstCol - 1 || cellCol === firstCol + 1)) return true;
+    if (cellCol === firstCol && (cellRow === firstRow - 1 || cellRow === firstRow + 1)) return true;
+  }
+
+  // If we already decided a direction, we can only click cells in that direction
+  if (firstRow === lastRow && cellRow === firstRow) {
+    // Going left
+    if (firstCol > lastCol && cellCol === lastCol - 1) return true;
+    // Going right
+    if (firstCol < lastCol && cellCol === lastCol + 1) return true;
+  }
+
+  if (firstCol === lastCol && cellCol === firstCol) {
+    // Going down
+    if (firstRow > lastRow && cellRow === lastRow - 1) return true;
+    // Going up
+    if (firstRow < lastRow && cellRow === lastRow + 1) return true;
+  }
+
+  // If it didn't match, return false
   return false;
 }
 
 export default function Home() {
-  const [ship, setShip] = useState<Set<symbol>>(() => new Set());
-
-  function handleCellClick(cell: symbol) {
-    const draft = new Set(ship);
-
-    draft.add(cell);
-
-    setShip(draft);
-  }
+  const [ship, setShip] = useState<Set<[number, number]>>(() => new Set());
 
   return (
     <main className="flex w-fit flex-col border">
@@ -124,7 +74,7 @@ export default function Home() {
                 className={`grid h-16 w-16 cursor-pointer place-content-center border ${
                   ship.has(cell) ? "bg-green-500" : "bg-transparent"
                 } ${isViable ? "cursor-pointer" : "cursor-not-allowed"}`}
-                onClick={() => isViable && handleCellClick(cell)}
+                onClick={() => isViable && setShip(new Set(ship.add(cell)))}
               >
                 <span>
                   {rowIndex}, {colIndex}
