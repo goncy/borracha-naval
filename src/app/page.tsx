@@ -71,7 +71,7 @@ export default function Home() {
             return (
               <div
                 key={colIndex}
-                className={`grid h-16 w-16 cursor-pointer place-content-center border ${
+                className={`grid h-16 w-16 place-content-center border ${
                   ship.has(cell) ? "bg-green-500" : "bg-transparent"
                 } ${isViable ? "cursor-pointer" : "cursor-not-allowed"}`}
                 onClick={() => isViable && setShip(new Set(ship.add(cell)))}
